@@ -13,7 +13,7 @@ function SetupContent() {
   useEffect(() => {
     if (!secret) {
       setStatus("error");
-      setMessage("Missing ?secret= in the URL. Copy AUTH_SECRET from your .env file.");
+      setMessage("Missing ?secret= in the URL. Use your SETUP_PASSWORD from .env (e.g. ?secret=ChangeMe123!).");
       return;
     }
 
@@ -63,7 +63,8 @@ function SetupContent() {
           <>
             <p className="mt-4 text-red-500">{message}</p>
             <p className="mt-4 text-sm text-muted">
-              Fix DATABASE_URL on Vercel, redeploy, then open this page again.
+              Use: /setup?secret=YOUR_SETUP_PASSWORD — same as SETUP_PASSWORD in .env and on Vercel.
+              Add SETUP_PASSWORD on Vercel if missing, then Redeploy.
             </p>
           </>
         )}

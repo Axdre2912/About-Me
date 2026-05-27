@@ -4,36 +4,41 @@ import { prisma } from "@/lib/prisma";
 
 /**
  * One-time production account setup.
- * Visit: /api/seed-account?secret=YOUR_AUTH_SECRET
- * Requires SETUP_EMAIL and SETUP_PASSWORD on Vercel.
- * Remove or disable after use.
+ * Visit: /setup?secret=YOUR_SETUP_PASSWORD
+ * Requires SETUP_EMAIL, SETUP_PASSWORD, DATABASE_URL on Vercel.
  */
 export async function GET(req: NextRequest) {
   const secret = req.nextUrl.searchParams.get("secret")?.trim();
-  const expected = process.env.AUTH_SECRET?.trim();
+  const setupPassword = process.env.SETUP_PASSWORD?.trim();
+  const authSecret = process.env.AUTH_SECRET?.trim();
 
-  if (!expected) {
+  const authorized =
+    !!secret &&
+    ((setupPassword && secret === setupPassword) ||
+      (authSecret && secret === authSecret));
+
+  if (!setupPassword) {
     return NextResponse.json(
       {
-        error: "AUTH_SECRET is not set on Vercel",
-        hint: "Add AUTH_SECRET in Vercel → Settings → Environment Variables (copy from your .env), then Redeploy.",
+        error: "SETUP_PASSWORD is not set on Vercel",
+        hint: "Add SETUP_PASSWORD in Vercel → Environment Variables (same as your .env), then Redeploy.",
       },
       { status: 401 }
     );
   }
 
-  if (!secret || secret !== expected) {
+  if (!authorized) {
     return NextResponse.json(
       {
-        error: "Unauthorized — secret does not match",
-        hint: "The ?secret= in your URL must exactly match AUTH_SECRET on Vercel (same as in your .env file). No extra spaces or quotes. Redeploy after updating Vercel.",
+        error: "Unauthorized — wrong setup password",
+        hint: `Use your diary password in the URL: /setup?secret=${encodeURIComponent(setupPassword)} (must match SETUP_PASSWORD on Vercel). Redeploy after changing env vars.`,
       },
       { status: 401 }
     );
   }
 
   const email = (process.env.SETUP_EMAIL || "you@example.com").toLowerCase();
-  const password = process.env.SETUP_PASSWORD || "ChangeMe123!";
+  const password = setupPassword;
   const name = process.env.SETUP_NAME || "Diary Owner";
 
   try {
