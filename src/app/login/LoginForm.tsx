@@ -1,61 +1,55 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import { useFormState, useFormStatus } from "react-dom";
+import { useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
-import { useRouter, useSearchParams } from "next/navigation";
 import { startAuthentication } from "@simplewebauthn/browser";
 import { Fingerprint, Loader2, Sun, Moon } from "lucide-react";
 import { useTheme } from "next-themes";
+import { loginWithCredentials, type LoginState } from "./actions";
+
+function SubmitButton() {
+  const { pending } = useFormStatus();
+  return (
+    <button
+      type="submit"
+      disabled={pending}
+      className="flex w-full items-center justify-center gap-2 rounded-lg bg-accent py-2.5 text-white transition hover:opacity-90 disabled:opacity-50"
+    >
+      {pending && <Loader2 size={18} className="animate-spin" />}
+      {pending ? "Signing in…" : "Sign in"}
+    </button>
+  );
+}
 
 export function LoginForm() {
-  const router = useRouter();
   const params = useSearchParams();
   const callbackUrl = params.get("callbackUrl") || "/";
   const { theme, setTheme } = useTheme();
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [state, formAction] = useFormState<LoginState, FormData>(
+    loginWithCredentials,
+    undefined
+  );
+  const [passkeyError, setPasskeyError] = useState("");
   const [passkeyLoading, setPasskeyLoading] = useState(false);
+  const [email, setEmail] = useState("");
 
-  // Show errors returned by NextAuth after redirect (e.g. ?error=CredentialsSignin)
   useEffect(() => {
     const err = params.get("error");
     if (err === "CredentialsSignin") {
-      setError("Invalid email or password");
-    } else if (err) {
-      setError("Sign in failed. Check AUTH_SECRET and AUTH_URL on Vercel, then redeploy.");
+      setPasskeyError("Invalid email or password");
     }
   }, [params]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
-
-    // redirect: true lets NextAuth set the session cookie via a full redirect (required on Vercel)
-    try {
-      await signIn("credentials", {
-        email: email.trim().toLowerCase(),
-        password,
-        callbackUrl: callbackUrl.startsWith("/") ? callbackUrl : "/",
-        redirect: true,
-      });
-    } catch {
-      setError("Sign in failed. Please try again.");
-      setLoading(false);
-    }
-    // On success the browser navigates away — no need to setLoading(false)
-  };
-
   const handlePasskey = async () => {
     if (!email) {
-      setError("Enter your email first for biometric login");
+      setPasskeyError("Enter your email first for biometric login");
       return;
     }
     setPasskeyLoading(true);
-    setError("");
+    setPasskeyError("");
 
     try {
       const optionsRes = await fetch("/api/webauthn/login/options", {
@@ -64,7 +58,7 @@ export function LoginForm() {
         body: JSON.stringify({ email: email.trim().toLowerCase() }),
       });
       if (!optionsRes.ok) {
-        setError("No passkey found. Sign in with password and register one in Settings.");
+        setPasskeyError("No passkey found. Sign in with password first.");
         setPasskeyLoading(false);
         return;
       }
@@ -79,7 +73,7 @@ export function LoginForm() {
       });
 
       if (!verifyRes.ok) {
-        setError("Biometric verification failed");
+        setPasskeyError("Biometric verification failed");
         setPasskeyLoading(false);
         return;
       }
@@ -92,10 +86,12 @@ export function LoginForm() {
         redirect: true,
       });
     } catch {
-      setError("Biometric login cancelled or unavailable");
+      setPasskeyError("Biometric login cancelled or unavailable");
       setPasskeyLoading(false);
     }
   };
+
+  const displayError = state?.error || passkeyError;
 
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center px-4">
@@ -114,13 +110,19 @@ export function LoginForm() {
           <p className="mt-2 text-sm text-muted">Your private space for daily reflection</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4 rounded-2xl border border-card-border bg-card p-6">
+        <form
+          action={formAction}
+          className="space-y-4 rounded-2xl border border-card-border bg-card p-6"
+        >
+          <input type="hidden" name="callbackUrl" value={callbackUrl} />
+
           <div>
             <label htmlFor="email" className="text-sm text-muted">
               Email
             </label>
             <input
               id="email"
+              name="email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -135,25 +137,17 @@ export function LoginForm() {
             </label>
             <input
               id="password"
+              name="password"
               type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
               required
               autoComplete="current-password"
               className="mt-1 w-full rounded-lg border border-card-border bg-background px-3 py-2 outline-none focus:border-accent"
             />
           </div>
 
-          {error && <p className="text-sm text-red-500">{error}</p>}
+          {displayError && <p className="text-sm text-red-500">{displayError}</p>}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-accent py-2.5 text-white transition hover:opacity-90 disabled:opacity-50"
-          >
-            {loading && <Loader2 size={18} className="animate-spin" />}
-            {loading ? "Signing in…" : "Sign in"}
-          </button>
+          <SubmitButton />
 
           <button
             type="button"
@@ -171,7 +165,7 @@ export function LoginForm() {
         </form>
 
         <p className="text-center text-xs text-muted">
-          Use <strong className="text-foreground">you@example.com</strong> and the password from your .env
+          Email: <strong className="text-foreground">you@example.com</strong> · Password from .env
         </p>
       </div>
     </div>
