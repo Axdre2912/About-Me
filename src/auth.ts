@@ -6,6 +6,7 @@ import { consumePasskeyToken } from "@/lib/passkey-tokens";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   trustHost: true,
+  secret: process.env.AUTH_SECRET,
   session: { strategy: "jwt" },
   pages: { signIn: "/login" },
   providers: [
@@ -21,7 +22,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           ? String(credentials.email).toLowerCase()
           : null;
 
-        // Biometric / passkey login after WebAuthn verification
         if (credentials?.passkeyToken) {
           const userId = consumePasskeyToken(String(credentials.passkeyToken));
           if (!userId) return null;

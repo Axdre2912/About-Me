@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { startAuthentication } from "@simplewebauthn/browser";
@@ -19,48 +19,34 @@ export function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [passkeyLoading, setPasskeyLoading] = useState(false);
 
+  // Show errors returned by NextAuth after redirect (e.g. ?error=CredentialsSignin)
+  useEffect(() => {
+    const err = params.get("error");
+    if (err === "CredentialsSignin") {
+      setError("Invalid email or password");
+    } else if (err) {
+      setError("Sign in failed. Check AUTH_SECRET and AUTH_URL on Vercel, then redeploy.");
+    }
+  }, [params]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
 
+    // redirect: true lets NextAuth set the session cookie via a full redirect (required on Vercel)
     try {
-      const result = (await Promise.race([
-        signIn("credentials", {
-          email: email.trim().toLowerCase(),
-          password,
-          redirect: false,
-        }),
-        new Promise<null>((_, reject) =>
-          setTimeout(() => reject(new Error("timeout")), 25000)
-        ),
-      ])) as { error?: string; ok?: boolean; url?: string } | null;
-
-      if (!result) {
-        setError("No response from server. Check Vercel env vars and redeploy.");
-        return;
-      }
-
-      if (result.error) {
-        setError("Invalid email or password");
-        return;
-      }
-
-      // Full page navigation is more reliable on Vercel than client router alone
-      window.location.href = callbackUrl.startsWith("/")
-        ? callbackUrl
-        : "/";
-    } catch (err) {
-      if (err instanceof Error && err.message === "timeout") {
-        setError(
-          "Login timed out. On Vercel, confirm DATABASE_URL and AUTH_SECRET match your .env, then redeploy."
-        );
-      } else {
-        setError("Login failed. Please try again.");
-      }
-    } finally {
+      await signIn("credentials", {
+        email: email.trim().toLowerCase(),
+        password,
+        callbackUrl: callbackUrl.startsWith("/") ? callbackUrl : "/",
+        redirect: true,
+      });
+    } catch {
+      setError("Sign in failed. Please try again.");
       setLoading(false);
     }
+    // On success the browser navigates away — no need to setLoading(false)
   };
 
   const handlePasskey = async () => {
@@ -75,7 +61,7 @@ export function LoginForm() {
       const optionsRes = await fetch("/api/webauthn/login/options", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email: email.trim().toLowerCase() }),
       });
       if (!optionsRes.ok) {
         setError("No passkey found. Sign in with password and register one in Settings.");
@@ -99,24 +85,16 @@ export function LoginForm() {
       }
 
       const { passkeyToken } = await verifyRes.json();
-      const result = await signIn("credentials", {
-        email,
+      await signIn("credentials", {
+        email: email.trim().toLowerCase(),
         passkeyToken,
-        redirect: false,
+        callbackUrl: "/",
+        redirect: true,
       });
-
-      if (result?.error) {
-        setError("Could not create session");
-        setPasskeyLoading(false);
-        return;
-      }
-
-      router.push(callbackUrl);
-      router.refresh();
     } catch {
       setError("Biometric login cancelled or unavailable");
+      setPasskeyLoading(false);
     }
-    setPasskeyLoading(false);
   };
 
   return (
@@ -147,6 +125,7 @@ export function LoginForm() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              autoComplete="email"
               className="mt-1 w-full rounded-lg border border-card-border bg-background px-3 py-2 outline-none focus:border-accent"
             />
           </div>
@@ -160,6 +139,7 @@ export function LoginForm() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              autoComplete="current-password"
               className="mt-1 w-full rounded-lg border border-card-border bg-background px-3 py-2 outline-none focus:border-accent"
             />
           </div>
@@ -172,7 +152,7 @@ export function LoginForm() {
             className="flex w-full items-center justify-center gap-2 rounded-lg bg-accent py-2.5 text-white transition hover:opacity-90 disabled:opacity-50"
           >
             {loading && <Loader2 size={18} className="animate-spin" />}
-            Sign in
+            {loading ? "Signing in…" : "Sign in"}
           </button>
 
           <button
@@ -191,7 +171,7 @@ export function LoginForm() {
         </form>
 
         <p className="text-center text-xs text-muted">
-          First time? Run <code className="rounded bg-card px-1">npm run setup</code> to create your account.
+          Use <strong className="text-foreground">you@example.com</strong> and the password from your .env
         </p>
       </div>
     </div>
