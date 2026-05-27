@@ -9,11 +9,27 @@ import { prisma } from "@/lib/prisma";
  * Remove or disable after use.
  */
 export async function GET(req: NextRequest) {
-  const secret = req.nextUrl.searchParams.get("secret");
-  const expected = process.env.AUTH_SECRET;
+  const secret = req.nextUrl.searchParams.get("secret")?.trim();
+  const expected = process.env.AUTH_SECRET?.trim();
 
-  if (!expected || secret !== expected) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!expected) {
+    return NextResponse.json(
+      {
+        error: "AUTH_SECRET is not set on Vercel",
+        hint: "Add AUTH_SECRET in Vercel → Settings → Environment Variables (copy from your .env), then Redeploy.",
+      },
+      { status: 401 }
+    );
+  }
+
+  if (!secret || secret !== expected) {
+    return NextResponse.json(
+      {
+        error: "Unauthorized — secret does not match",
+        hint: "The ?secret= in your URL must exactly match AUTH_SECRET on Vercel (same as in your .env file). No extra spaces or quotes. Redeploy after updating Vercel.",
+      },
+      { status: 401 }
+    );
   }
 
   const email = (process.env.SETUP_EMAIL || "you@example.com").toLowerCase();

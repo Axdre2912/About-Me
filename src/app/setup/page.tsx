@@ -25,7 +25,8 @@ function SetupContent() {
           setMessage(data.message || "Account ready.");
         } else {
           setStatus("error");
-          setMessage(data.error || data.hint || "Setup failed.");
+          const parts = [data.error, data.hint].filter(Boolean);
+          setMessage(parts.join(" — ") || "Setup failed.");
         }
       })
       .catch(() => {
