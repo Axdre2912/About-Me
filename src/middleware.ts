@@ -14,7 +14,11 @@ export default async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // Never require login for one-time setup (API + friendly page)
-  if (pathname.startsWith("/api/seed-account") || pathname === "/setup") {
+  if (
+    pathname.startsWith("/api/seed-account") ||
+    pathname.startsWith("/api/health") ||
+    pathname === "/setup"
+  ) {
     return NextResponse.next();
   }
 
@@ -35,5 +39,5 @@ export default async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/seed-account).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/seed-account|api/health).*)"],
 };

@@ -24,19 +24,43 @@ export function LoginForm() {
     setLoading(true);
     setError("");
 
-    const result = await signIn("credentials", {
-      email,
-      password,
-      redirect: false,
-    });
+    try {
+      const result = (await Promise.race([
+        signIn("credentials", {
+          email: email.trim().toLowerCase(),
+          password,
+          redirect: false,
+        }),
+        new Promise<null>((_, reject) =>
+          setTimeout(() => reject(new Error("timeout")), 25000)
+        ),
+      ])) as { error?: string; ok?: boolean; url?: string } | null;
 
-    setLoading(false);
-    if (result?.error) {
-      setError("Invalid email or password");
-      return;
+      if (!result) {
+        setError("No response from server. Check Vercel env vars and redeploy.");
+        return;
+      }
+
+      if (result.error) {
+        setError("Invalid email or password");
+        return;
+      }
+
+      // Full page navigation is more reliable on Vercel than client router alone
+      window.location.href = callbackUrl.startsWith("/")
+        ? callbackUrl
+        : "/";
+    } catch (err) {
+      if (err instanceof Error && err.message === "timeout") {
+        setError(
+          "Login timed out. On Vercel, confirm DATABASE_URL and AUTH_SECRET match your .env, then redeploy."
+        );
+      } else {
+        setError("Login failed. Please try again.");
+      }
+    } finally {
+      setLoading(false);
     }
-    router.push(callbackUrl);
-    router.refresh();
   };
 
   const handlePasskey = async () => {
