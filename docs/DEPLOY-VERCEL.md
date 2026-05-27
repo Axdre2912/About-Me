@@ -113,12 +113,23 @@ Save the file.
 
 ### 2.4 Create tables on Neon (from your PC)
 
-In PowerShell, in the project folder:
+**If you get `P1001: Can't reach database server`** — this is usually Neon waking from sleep. See [Fix P1001](#fix-p1001-cant-reach-database-server) below.
+
+1. In the **Neon dashboard**, open your project and click **SQL Editor** → run `SELECT 1;` (wakes the database).
+2. In Neon → **Connect**, copy **both** connection strings:
+   - **Pooled** → `DATABASE_URL` (hostname has `-pooler`)
+   - **Direct** → `DIRECT_URL` (no `-pooler`)
+3. Add to the end of each URL: `&connect_timeout=30`
+
+Put both in your `.env` file (do not rely only on `$env:DATABASE_URL` in PowerShell — Prisma also reads `.env`).
 
 ```powershell
-# Temporarily point at Neon (paste YOUR connection string)
-$env:DATABASE_URL = "postgresql://user:password@ep-xxxx.neon.tech/neondb?sslmode=require"
+npx prisma db push
+```
 
+If that works, then create a migration:
+
+```powershell
 npx prisma migrate dev --name init_postgres
 ```
 
@@ -347,10 +358,34 @@ Vercel automatically rebuilds and deploys from `main`.
 
 ---
 
+## Fix P1001: Can't reach database server
+
+Neon **pauses** inactive databases. Prisma often times out before Neon wakes up.
+
+1. **Rotate your password** in Neon → Settings → Reset password (if you shared the connection string anywhere).
+2. Open **Neon dashboard** → **SQL Editor** → run `SELECT 1;` and wait until it succeeds.
+3. Use the **Direct** connection string for migrations (Neon → Connect → **Direct connection**).
+4. Add timeout to the URL:
+   ```
+   ...?sslmode=require&connect_timeout=30
+   ```
+5. In `.env`, set **both** (see `.env.example`):
+   - `DATABASE_URL` = pooled string (for the app)
+   - `DIRECT_URL` = direct string (for Prisma CLI)
+6. Comment out or remove the old SQLite line: `# DATABASE_URL="file:./dev.db"`
+7. Retry:
+   ```powershell
+   npx prisma db push
+   ```
+8. If it still fails: disable VPN, allow Node.js through Windows Firewall, try again after 30 seconds.
+
+---
+
 ## Part 10: Troubleshooting
 
 | Problem | Fix |
 |---------|-----|
+| **P1001 on Neon** | See [Fix P1001](#fix-p1001-cant-reach-database-server) above |
 | **Build fails on Vercel** | Open the deployment log; often a missing env var or Prisma migrate. Ensure `prisma/migrations` is committed. |
 | **“Invalid credentials”** | Re-run `npm run setup` locally with Neon `DATABASE_URL`, or check email/password. |
 | **Login works locally but not on Vercel** | `NEXTAUTH_URL` must exactly match the site URL. Redeploy after changing. |

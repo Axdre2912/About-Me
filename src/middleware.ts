@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
 
-const publicPaths = ["/login", "/api/auth", "/api/webauthn/login"];
+const publicPaths = ["/login", "/api/auth", "/api/webauthn/login", "/api/seed-account"];
 
 export default async function middleware(req: NextRequest) {
   const token = await getToken({ req, secret: process.env.AUTH_SECRET });

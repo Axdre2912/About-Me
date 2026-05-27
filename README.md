@@ -111,7 +111,9 @@ src/
 
 ## Deploy to your phone (anywhere) — Option B
 
-**Full step-by-step guide:** [docs/DEPLOY-VERCEL.md](docs/DEPLOY-VERCEL.md)
+**Full Vercel deploy guide (start here):** [docs/VERCEL-DEPLOY-GUIDE.md](docs/VERCEL-DEPLOY-GUIDE.md)
+
+**Neon + troubleshooting:** [docs/DEPLOY-VERCEL.md](docs/DEPLOY-VERCEL.md)
 
 Covers GitHub, Neon PostgreSQL, Vercel, env vars, phone install, photos, and troubleshooting.
 

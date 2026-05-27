@@ -2,6 +2,7 @@
  * First-time setup: creates .env, pushes DB schema, and seeds the owner account.
  * Run: npm run setup
  */
+require("dotenv").config();
 const fs = require("fs");
 const path = require("path");
 const { execSync } = require("child_process");
@@ -50,12 +51,27 @@ SETUP_NAME="${name}"
 
 const env = loadEnv(envPath);
 process.env.DATABASE_URL = env.DATABASE_URL || "file:./dev.db";
+if (env.DIRECT_URL) process.env.DIRECT_URL = env.DIRECT_URL;
 
-execSync("npx prisma db push", { cwd: root, stdio: "inherit", env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL } });
+// Neon on Windows often blocks port 5432 — use HTTP-based schema push instead
+const dbUrl = process.env.DATABASE_URL || "";
+if (dbUrl.includes("neon.tech")) {
+  if (process.env.SKIP_DB_PUSH !== "1") {
+    console.log("Using Neon HTTP schema push (npm run db:push:neon)...");
+    console.log("If tables already exist, run: $env:SKIP_DB_PUSH=1; npm run setup");
+    try {
+      execSync("npm run db:push:neon", { cwd: root, stdio: "inherit" });
+    } catch {
+      console.log("Schema push skipped or failed — continuing to create user...");
+    }
+  }
+} else {
+  execSync("npx prisma db push", { cwd: root, stdio: "inherit" });
+}
 
 const bcrypt = require("bcryptjs");
-const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient();
+const { createPrisma } = require("./create-prisma");
+const prisma = createPrisma();
 
 async function main() {
   const email = (env.SETUP_EMAIL || process.env.SETUP_EMAIL || "you@example.com").toLowerCase();
