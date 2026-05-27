@@ -2,11 +2,23 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
 
-const publicPaths = ["/login", "/api/auth", "/api/webauthn/login", "/api/seed-account"];
+const publicPaths = [
+  "/login",
+  "/setup",
+  "/api/auth",
+  "/api/webauthn/login",
+  "/api/seed-account",
+];
 
 export default async function middleware(req: NextRequest) {
-  const token = await getToken({ req, secret: process.env.AUTH_SECRET });
   const { pathname } = req.nextUrl;
+
+  // Never require login for one-time setup (API + friendly page)
+  if (pathname.startsWith("/api/seed-account") || pathname === "/setup") {
+    return NextResponse.next();
+  }
+
+  const token = await getToken({ req, secret: process.env.AUTH_SECRET });
   const isPublic = publicPaths.some((p) => pathname.startsWith(p));
 
   if (!token && !isPublic) {
@@ -23,5 +35,5 @@ export default async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/seed-account).*)"],
 };
