@@ -2,11 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateEntry } from "@/lib/entries";
-import {
-  ensureUploadDir,
-  processAndSaveImage,
-  getPhotoPath,
-} from "@/lib/photos";
+import { processImage } from "@/lib/photos";
 import { randomUUID } from "crypto";
 
 const MAX_PHOTOS = 12;
@@ -24,15 +20,8 @@ export async function POST(
   const { date } = await params;
   const entry = await getOrCreateEntry(session.user.id, date);
 
-  const dbEntry = await prisma.diaryEntry.findUnique({
-    where: { id: entry.id },
-    include: { photos: true },
-  });
-  if (!dbEntry) {
-    return NextResponse.json({ error: "Entry not found" }, { status: 404 });
-  }
-
-  if (dbEntry.photos.length >= MAX_PHOTOS) {
+  const photoCount = await prisma.photo.count({ where: { entryId: entry.id } });
+  if (photoCount >= MAX_PHOTOS) {
     return NextResponse.json({ error: `Maximum ${MAX_PHOTOS} photos per entry` }, { status: 400 });
   }
 
@@ -53,28 +42,20 @@ export async function POST(
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
-  await ensureUploadDir(session.user.id, dbEntry.id);
+  const processed = await processImage(buffer, mimeType);
 
-  const ext = mimeType === "image/png" ? ".png" : ".jpg";
-  const filename = `${randomUUID()}${ext}`;
-  const destPath = getPhotoPath(session.user.id, dbEntry.id, filename);
-
-  const meta = await processAndSaveImage(buffer, destPath, mimeType);
-  const finalFilename =
-    mimeType === "image/png" ? filename : filename.replace(/\.[^.]+$/, ".jpg");
-  const finalMime = mimeType === "image/png" ? "image/png" : "image/jpeg";
-
-  const sortOrder = dbEntry.photos.length;
   const photo = await prisma.photo.create({
     data: {
-      entryId: dbEntry.id,
-      filename: finalFilename,
-      mimeType: finalMime,
-      width: meta.width,
-      height: meta.height,
-      sizeBytes: meta.sizeBytes,
-      sortOrder,
+      entryId: entry.id,
+      filename: `${randomUUID()}${processed.ext}`,
+      mimeType: processed.mimeType,
+      width: processed.width,
+      height: processed.height,
+      sizeBytes: processed.sizeBytes,
+      sortOrder: photoCount,
+      data: new Uint8Array(processed.data),
     },
+    select: { id: true, sortOrder: true },
   });
 
   return NextResponse.json({

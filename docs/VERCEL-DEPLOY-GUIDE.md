@@ -252,15 +252,15 @@ Vercel rebuilds automatically (1–3 minutes).
 
 ---
 
-## PART 6 — Photos on Vercel (important)
+## PART 6 — Photos & audio on Vercel
 
-Photo files are stored on disk locally. **Vercel does not keep uploaded photos** between requests.
+Photos and audio clips are stored **inside the Neon database** (not on disk), so they persist permanently on Vercel — no extra storage service needed.
 
-| What works on Vercel | What may not |
-|----------------------|--------------|
-| Diary text, moods, ratings | Photo uploads may fail or disappear |
+Notes:
 
-For full photo support in production, you would need cloud storage (e.g. Vercel Blob). Text diary works fully.
+- Photos are compressed server-side (max 1920px) before saving.
+- Audio clips: up to 6 per entry, max 4MB each (Vercel's request size limit).
+- New schema columns are created by `npm run db:migrate:media` (already applied; safe to re-run).
 
 ---
 

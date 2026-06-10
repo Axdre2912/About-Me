@@ -45,6 +45,7 @@ model DiaryEntry {
   updatedAt DateTime @updatedAt
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   photos    Photo[]
+  audios    Audio[]
 
   @@unique([userId, date])
   @@index([userId])
@@ -61,6 +62,21 @@ model Photo {
   sizeBytes Int
   sortOrder Int        @default(0)
   createdAt DateTime   @default(now())
+  data      Bytes? // image bytes stored in DB so they survive serverless redeploys
+  entry     DiaryEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  @@index([entryId])
+}
+
+model Audio {
+  id        String     @id @default(cuid())
+  entryId   String
+  filename  String
+  mimeType  String
+  sizeBytes Int
+  sortOrder Int        @default(0)
+  createdAt DateTime   @default(now())
+  data      Bytes
   entry     DiaryEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
 
   @@index([entryId])

@@ -1,71 +1,49 @@
-import fs from "fs/promises";
-import path from "path";
 import sharp from "sharp";
 import { prisma } from "./prisma";
 
-const UPLOAD_ROOT = path.join(process.cwd(), "uploads");
-
-export function getPhotoPath(userId: string, entryId: string, filename: string) {
-  return path.join(UPLOAD_ROOT, userId, entryId, filename);
-}
-
-export async function ensureUploadDir(userId: string, entryId: string) {
-  const dir = path.join(UPLOAD_ROOT, userId, entryId);
-  await fs.mkdir(dir, { recursive: true });
-  return dir;
-}
-
-/** Resize and compress uploaded images for efficient storage */
-export async function processAndSaveImage(
+/**
+ * Resize and compress an uploaded image. Returns the processed bytes so they
+ * can be stored in the database (persistent across serverless deploys).
+ */
+export async function processImage(
   buffer: Buffer,
-  destPath: string,
   mimeType: string
-): Promise<{ width: number; height: number; sizeBytes: number }> {
-  const pipeline = sharp(buffer).rotate();
+): Promise<{ data: Buffer; mimeType: string; ext: string; width: number; height: number; sizeBytes: number }> {
+  const pipeline = sharp(buffer)
+    .rotate()
+    .resize(1920, 1920, { fit: "inside", withoutEnlargement: true });
+
+  let data: Buffer;
+  let outMime: string;
+  let ext: string;
 
   if (mimeType === "image/png") {
-    await pipeline
-      .resize(1920, 1920, { fit: "inside", withoutEnlargement: true })
-      .png({ quality: 80, compressionLevel: 9 })
-      .toFile(destPath);
+    data = await pipeline.png({ quality: 80, compressionLevel: 9 }).toBuffer();
+    outMime = "image/png";
+    ext = ".png";
   } else {
-    await pipeline
-      .resize(1920, 1920, { fit: "inside", withoutEnlargement: true })
-      .jpeg({ quality: 82, mozjpeg: true })
-      .toFile(destPath.replace(/\.[^.]+$/, ".jpg"));
+    data = await pipeline.jpeg({ quality: 82, mozjpeg: true }).toBuffer();
+    outMime = "image/jpeg";
+    ext = ".jpg";
   }
 
-  const finalPath = mimeType === "image/png" ? destPath : destPath.replace(/\.[^.]+$/, ".jpg");
-  const meta = await sharp(finalPath).metadata();
-  const stat = await fs.stat(finalPath);
+  const meta = await sharp(data).metadata();
 
   return {
+    data,
+    mimeType: outMime,
+    ext,
     width: meta.width ?? 0,
     height: meta.height ?? 0,
-    sizeBytes: stat.size,
+    sizeBytes: data.length,
   };
-}
-
-export async function deletePhotoFile(userId: string, entryId: string, filename: string) {
-  try {
-    await fs.unlink(getPhotoPath(userId, entryId, filename));
-  } catch {
-    // file may already be gone
-  }
 }
 
 export async function getPhotoForUser(photoId: string, userId: string) {
   const photo = await prisma.photo.findFirst({
     where: { id: photoId, entry: { userId } },
-    include: { entry: true },
+    select: { data: true, mimeType: true },
   });
-  if (!photo) return null;
-
-  const filePath = getPhotoPath(userId, photo.entryId, photo.filename);
-  try {
-    const data = await fs.readFile(filePath);
-    return { data, mimeType: photo.mimeType };
-  } catch {
-    return null;
-  }
+  if (!photo?.data) return null;
+  return { data: Buffer.from(photo.data), mimeType: photo.mimeType };
 }

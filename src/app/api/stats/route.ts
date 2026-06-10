@@ -12,7 +12,7 @@ export async function GET() {
 
   const entries = await prisma.diaryEntry.findMany({
     where: { userId: session.user.id },
-    include: { photos: true },
+    include: { photos: { select: { id: true } } },
   });
 
   const active = entries.filter((e) => e.wordCount > 0 || e.photos.length > 0);

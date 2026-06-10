@@ -53,8 +53,23 @@ CREATE TABLE "Photo" (
     "sizeBytes" INTEGER NOT NULL,
     "sortOrder" INTEGER NOT NULL DEFAULT 0,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "data" BYTEA,
 
     CONSTRAINT "Photo_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Audio" (
+    "id" TEXT NOT NULL,
+    "entryId" TEXT NOT NULL,
+    "filename" TEXT NOT NULL,
+    "mimeType" TEXT NOT NULL,
+    "sizeBytes" INTEGER NOT NULL,
+    "sortOrder" INTEGER NOT NULL DEFAULT 0,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "data" BYTEA NOT NULL,
+
+    CONSTRAINT "Audio_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateIndex
@@ -78,6 +93,9 @@ CREATE UNIQUE INDEX "DiaryEntry_userId_date_key" ON "DiaryEntry"("userId", "date
 -- CreateIndex
 CREATE INDEX "Photo_entryId_idx" ON "Photo"("entryId");
 
+-- CreateIndex
+CREATE INDEX "Audio_entryId_idx" ON "Audio"("entryId");
+
 -- AddForeignKey
 ALTER TABLE "Passkey" ADD CONSTRAINT "Passkey_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
@@ -86,3 +104,6 @@ ALTER TABLE "DiaryEntry" ADD CONSTRAINT "DiaryEntry_userId_fkey" FOREIGN KEY ("u
 
 -- AddForeignKey
 ALTER TABLE "Photo" ADD CONSTRAINT "Photo_entryId_fkey" FOREIGN KEY ("entryId") REFERENCES "DiaryEntry"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Audio" ADD CONSTRAINT "Audio_entryId_fkey" FOREIGN KEY ("entryId") REFERENCES "DiaryEntry"("id") ON DELETE CASCADE ON UPDATE CASCADE;

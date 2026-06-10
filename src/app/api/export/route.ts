@@ -3,8 +3,6 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { parseMoodTags } from "@/lib/utils";
 import archiver from "archiver";
-import fs from "fs";
-import { getPhotoPath } from "@/lib/photos";
 import { PassThrough } from "stream";
 
 export async function GET(req: NextRequest) {
@@ -17,7 +15,10 @@ export async function GET(req: NextRequest) {
 
   const entries = await prisma.diaryEntry.findMany({
     where: { userId: session.user.id },
-    include: { photos: true },
+    include: {
+      photos: { select: { id: true, filename: true, mimeType: true } },
+      audios: { select: { id: true, filename: true, mimeType: true } },
+    },
     orderBy: { date: "asc" },
   });
 
@@ -33,6 +34,11 @@ export async function GET(req: NextRequest) {
         id: p.id,
         filename: p.filename,
         mimeType: p.mimeType,
+      })),
+      audios: e.audios.map((a) => ({
+        id: a.id,
+        filename: a.filename,
+        mimeType: a.mimeType,
       })),
     })),
   };
@@ -53,12 +59,27 @@ export async function GET(req: NextRequest) {
     archive.pipe(passThrough);
     archive.append(JSON.stringify(exportData, null, 2), { name: "diary.json" });
 
+    // Fetch binary data one file at a time to keep memory bounded
     for (const entry of entries) {
       for (const photo of entry.photos) {
-        const filePath = getPhotoPath(session.user.id, entry.id, photo.filename);
-        if (fs.existsSync(filePath)) {
-          archive.file(filePath, {
+        const row = await prisma.photo.findUnique({
+          where: { id: photo.id },
+          select: { data: true },
+        });
+        if (row?.data) {
+          archive.append(Buffer.from(row.data), {
             name: `photos/${entry.date}/${photo.filename}`,
+          });
+        }
+      }
+      for (const audio of entry.audios) {
+        const row = await prisma.audio.findUnique({
+          where: { id: audio.id },
+          select: { data: true },
+        });
+        if (row?.data) {
+          archive.append(Buffer.from(row.data), {
+            name: `audio/${entry.date}/${audio.filename}`,
           });
         }
       }

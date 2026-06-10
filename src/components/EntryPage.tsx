@@ -10,6 +10,7 @@ import { DiaryEditor } from "./DiaryEditor";
 import { StarRating } from "./StarRating";
 import { MoodTags } from "./MoodTags";
 import { PhotoGrid } from "./PhotoGrid";
+import { AudioSection } from "./AudioSection";
 import { OnThisDay } from "./OnThisDay";
 import { useAutoSave } from "@/hooks/useAutoSave";
 import type { EntryDTO } from "@/lib/entries";
@@ -114,6 +115,12 @@ export function EntryPage({ date }: Props) {
         date={date}
         photos={entry.photos}
         onPhotosChange={(photos) => setEntry({ ...entry, photos })}
+      />
+
+      <AudioSection
+        date={date}
+        audios={entry.audios}
+        onAudiosChange={(audios) => setEntry({ ...entry, audios })}
       />
 
       <OnThisDay date={date} />

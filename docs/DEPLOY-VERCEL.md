@@ -13,14 +13,15 @@ Your app currently uses:
 
 | Feature | Local dev | Vercel production |
 |---------|-----------|-------------------|
-| Database (SQLite file) | Works | **Does not work** — serverless has no persistent disk |
-| Photos (`uploads/` folder) | Works | **Does not work** — files are deleted between requests |
+| Database (Neon PostgreSQL) | Works | Works |
+| Photos & audio (stored in the database) | Works | Works — persists permanently |
 
 So for Option B you will:
 
 1. Move the database to **Neon** (free hosted PostgreSQL).
-2. Choose how to handle **photos** (see [Part 6](#part-6-photo-storage-choose-one-path)).
-3. Deploy the app on **Vercel** and install it on your phone from the live URL.
+2. Deploy the app on **Vercel** and install it on your phone from the live URL.
+
+Photos and audio are stored in the Neon database itself, so they survive redeploys without any extra storage service.
 
 ---
 
@@ -277,37 +278,13 @@ WEBAUTHN_RP_ID=your-app.vercel.app
 
 ---
 
-## Part 6: Photo storage (choose one path)
+## Part 6: Photo & audio storage
 
-Local photo uploads **do not persist on Vercel**. Pick one:
+Photos and audio clips are stored **in the Neon database** as binary data, so they persist permanently on Vercel with no extra setup.
 
-### Path A — Use Vercel without photos (simplest)
-
-- Use the diary for **text, moods, and ratings** only on Vercel  
-- Photo upload may fail or disappear after redeploy  
-- Good if you rarely attach photos  
-
-### Path B — Vercel Blob (photos on Vercel)
-
-1. Vercel dashboard → your project → **Storage** → **Create Database / Store** → **Blob**  
-2. Connect Blob to the project (Vercel adds `BLOB_READ_WRITE_TOKEN` automatically)  
-3. **Code change required:** photo save/read must use `@vercel/blob` instead of the `uploads/` folder  
-   - If you want this implemented in the repo, ask to add “Vercel Blob photo storage”  
-
-### Path C — Keep photos on Railway, app on Vercel (split)
-
-Not recommended for beginners — use Path D instead.
-
-### Path D — Deploy everything on Railway (easiest if you need photos today)
-
-Railway gives a persistent disk so **SQLite + uploads work without code changes**:
-
-1. https://railway.app → New Project → Deploy from GitHub  
-2. Select your repo  
-3. Add variables: `AUTH_SECRET`, `NEXTAUTH_URL` (Railway URL), `DATABASE_URL=file:./dev.db`  
-4. Add a **Volume** mounted at `/app/uploads` (see Railway docs)  
-
-This is not Vercel, but it satisfies “use on phone anywhere” with photos intact.
+- Photos: up to 12 per entry, compressed server-side (max 1920px).
+- Audio: up to 6 clips per entry, max 4MB each (Vercel request size limit). MP3, M4A, AAC, WAV, OGG, WebM, and FLAC are supported.
+- If you set up a fresh database, `npm run db:push:neon` creates all tables. For a database created before media-in-DB support, run `npm run db:migrate:media` once.
 
 ---
 
@@ -390,7 +367,7 @@ Neon **pauses** inactive databases. Prisma often times out before Neon wakes up.
 | **“Invalid credentials”** | Re-run `npm run setup` locally with Neon `DATABASE_URL`, or check email/password. |
 | **Login works locally but not on Vercel** | `NEXTAUTH_URL` must exactly match the site URL. Redeploy after changing. |
 | **Session drops immediately** | `AUTH_SECRET` must be set on Vercel and must not change between deploys. |
-| **Photos upload then vanish** | Expected on Vercel without Blob/Railway — see Part 6. |
+| **Photos/audio upload fails** | Run `npm run db:migrate:media` once against your Neon database (adds the binary storage columns). |
 | **Biometric login fails** | Use HTTPS URL; register passkey again on production after deploy. |
 | **Database connection error** | Neon string must include `?sslmode=require`. Check IP allowlist (Neon allows all by default). |
 | **Prisma migrate errors** | Run `npx prisma migrate deploy` in Vercel build — add to `package.json`: `"build": "prisma migrate deploy && prisma generate && next build"` |
@@ -424,7 +401,7 @@ So Vercel applies migrations on each deploy (after you complete Part 2.4).
 - [ ] Login tested in browser  
 - [ ] Phone: opened URL, signed in, added to home screen  
 - [ ] Passkey registered on phone (optional)  
-- [ ] Photo strategy chosen (Part 6)  
+- [ ] `npm run db:migrate:media` run once (photos/audio in DB — Part 6)  
 - [ ] First JSON/ZIP backup exported  
 
 ---
@@ -439,8 +416,6 @@ So Vercel applies migrations on each deploy (after you complete Part 2.4).
 | `WEBAUTHN_RP_ID` | `your-app.vercel.app` | Optional (passkeys) |
 | `SETUP_EMAIL` | `you@example.com` | Setup only |
 | `SETUP_PASSWORD` | strong password | Setup only |
-| `BLOB_READ_WRITE_TOKEN` | (auto on Vercel) | Only if using Vercel Blob |
-
 ---
 
 ## Need help?

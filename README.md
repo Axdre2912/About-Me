@@ -23,10 +23,11 @@ Open [http://localhost:3000](http://localhost:3000) and sign in with the email/p
 | Mood tags | Presets + custom tags |
 | Day rating | 1–5 emoji scale |
 | Photos | Up to 12 per entry, compressed with Sharp, grid + lightbox |
+| Audio | Up to 6 clips per entry (MP3, M4A, WAV, OGG, WebM...), inline player |
 | Calendar | Monthly view with entry indicators and ratings |
 | Search | Keywords, mood, rating filters + quick filters |
 | Auth | Email/password + optional WebAuthn (Face ID / Touch ID) |
-| Export | JSON or ZIP (entries + photos) |
+| Export | JSON or ZIP (entries + photos + audio) |
 | Stats | Mood trends, monthly averages, photo counts |
 | On This Day | Past entries from the same month/day |
 | Reminders | Evening banner + browser notifications (opt-in) |
@@ -90,6 +91,8 @@ src/
 | `/api/entries/[date]` | GET, PATCH | Load / update entry |
 | `/api/entries/[date]/photos` | POST | Upload photo |
 | `/api/photos/[id]` | GET, DELETE | Serve / delete photo |
+| `/api/entries/[date]/audio` | POST | Upload audio clip |
+| `/api/audio/[id]` | GET, DELETE | Stream / delete audio |
 | `/api/calendar` | GET | Month summary |
 | `/api/search` | GET | Search & filter |
 | `/api/stats` | GET | Dashboard data |
@@ -99,8 +102,8 @@ src/
 
 ## Data storage
 
-- **Entries, moods, ratings** — SQLite via Prisma (`prisma/dev.db`)
-- **Photos** — Compressed files in `uploads/{userId}/{entryId}/` (gitignored)
+- **Entries, moods, ratings** — PostgreSQL (Neon) via Prisma
+- **Photos & audio** — Stored as binary data in the database, so they persist permanently on serverless hosts like Vercel
 
 ## Production notes
 
